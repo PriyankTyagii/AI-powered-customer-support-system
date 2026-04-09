@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  role           MessageRole
+  content        String
+  agentType      AgentType?
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  orderNumber    String      @unique
+  userId         String
+  status         OrderStatus
+  trackingNumber String?
+  eta            DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  invoices       Invoice[]
+
+  @@index([userId])
+}
+
+model Invoice {
+  id         String        @id @default(cuid())
+  invoiceNo  String        @unique
+  userId     String
+  orderId    String?
+  amount     Float
+  currency   String        @default("USD")
+  status     InvoiceStatus
+  issuedAt   DateTime
+  dueAt      DateTime
+  createdAt  DateTime      @default(now())
+  order      Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  refunds    Refund[]
+
+  @@index([userId])
+}
+
+model Refund {
+  id          String       @id @default(cuid())
+  invoiceId   String
+  amount      Float
+  reason      String
+  status      RefundStatus
+  requestedAt DateTime     @default(now())
+  resolvedAt  DateTime?
+  invoice     Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+enum MessageRole {
+  user
+  assistant
+}
+
+enum AgentType {
+  support
+  order
+  billing
+}
+
+enum OrderStatus {
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+  REFUNDED
+}
+
+enum RefundStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  COMPLETED
+}

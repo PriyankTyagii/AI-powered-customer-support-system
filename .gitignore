@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+coverage/
+.turbo/
+apps/api/prisma/dev.db
+apps/api/generated/
+*.log
+*.zip

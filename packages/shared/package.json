@@ -1,0 +1,16 @@
+{
+  "name": "@support/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc --noEmit",
+    "test": "echo \"No tests for shared\""
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
+}
