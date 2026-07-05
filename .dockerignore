@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/.turbo
+**/.next
+.git
+.github
+**/.env
+**/.env.*
+!**/.env.example
+apps/web/src
+apps/web/index.html
+apps/web/vite.config.ts
+*.log
+*.md

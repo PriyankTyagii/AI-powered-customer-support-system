@@ -336,6 +336,40 @@ Responses stream in progressively; conversations persist in the sidebar, where y
 
 ---
 
+## Deployment
+
+The API and web app deploy separately: the API is a persistent Hono/Node server (with SSE streaming), so it runs as a container on **Render**, while the static SPA goes to **Vercel**. The database is **Neon**.
+
+### API → Render (Docker)
+
+The repo ships a [`Dockerfile`](./Dockerfile) and a [`render.yaml`](./render.yaml) blueprint. In the Render dashboard: **New → Blueprint**, pick this repo, then set these environment variables (Secrets):
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | Neon connection string (keep `?schema=support`) |
+| `GROQ_API_KEY` | Groq key (or `XAI_API_KEY`) |
+| `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` | Service-account credentials |
+| `CORS_ORIGIN` | Your Vercel URL, e.g. `https://your-app.vercel.app` |
+
+Render injects `PORT` automatically. Run the schema sync once from your machine against the production database: `DATABASE_URL="<neon-url>" npm run db:push && npm run db:seed`.
+
+> Free instances spin down after ~15 min idle. The included [`keep-warm`](./.github/workflows/keep-warm.yml) GitHub Action pings `/api/health` every 10 minutes — set the `API_HEALTH_URL` repo secret to `https://<your-api>.onrender.com/api/health` to enable it.
+
+### Web → Vercel
+
+Import the repo in Vercel with **Root Directory** = `apps/web` (framework auto-detects as Vite). Environment variables:
+
+| Variable | Value |
+|---|---|
+| `VITE_API_BASE_URL` | `https://<your-api>.onrender.com` |
+| `VITE_FIREBASE_*` | Firebase web config |
+
+### After deploying
+
+Add your Vercel domain under **Firebase → Authentication → Settings → Authorized domains**, or Google sign-in will be rejected in production.
+
+---
+
 ## Roadmap
 
-See [`PRODUCTION_READINESS.md`](./PRODUCTION_READINESS.md) for the remaining path to production: Dockerfiles + CI, a shared-store rate limiter, a CORS allow-list, `prisma migrate` history, and observability.
+See [`PRODUCTION_READINESS.md`](./PRODUCTION_READINESS.md) for the remaining path to production: CI, a shared-store (Redis) rate limiter, `prisma migrate` history, and observability.
