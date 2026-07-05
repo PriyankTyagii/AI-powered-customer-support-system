@@ -19,7 +19,7 @@ This project demonstrates a practical implementation of an agentic AI backend in
 | Database | PostgreSQL |
 | ORM | Prisma |
 | Monorepo | Turborepo |
-| AI Layer | Vercel AI SDK pattern with fallback streaming |
+| AI Layer | Vercel AI SDK + xAI (Grok) with deterministic fallback streaming |
 
 ---
 
@@ -185,12 +185,32 @@ Default values for local development:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/support_db?schema=public"
-OPENAI_API_KEY=""
+GROQ_API_KEY=""
+XAI_API_KEY=""
+AI_MODEL=""
 PORT="3000"
 VITE_API_BASE_URL="http://localhost:3000"
 ```
 
-> `OPENAI_API_KEY` is optional. When omitted, the backend uses deterministic fallback streaming output.
+> The AI key is optional — when omitted, the backend streams a deterministic fallback response. Two providers are supported through their OpenAI-compatible endpoints (no extra SDK): **Groq** (`GROQ_API_KEY`, keys start with `gsk_`, default model `llama-3.3-70b-versatile`) and **xAI Grok** (`XAI_API_KEY`, keys start with `xai-`, default model `grok-3`). Groq takes priority if both are set; override the model with `AI_MODEL`.
+
+### Authentication (Firebase Google Sign-In)
+
+The app uses **Firebase Authentication with the Google provider only** (no email/password). Users must sign in
+with Google before they can chat; each user only sees their own conversations.
+
+**One-time Firebase setup:**
+
+1. In the [Firebase console](https://console.firebase.google.com), create a project and a **Web app**.
+2. Under **Authentication → Sign-in method**, enable **Google**.
+3. Copy the web config into `apps/web/.env` (see `apps/web/.env.example`):
+   `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`.
+   These are public client keys — safe to ship in the browser bundle.
+4. Under **Project settings → Service accounts → Generate new private key**, download the JSON and put its
+   values into `apps/api/.env` (see `apps/api/.env.example`): `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`,
+   `FIREBASE_PRIVATE_KEY`. **These are secrets** — never commit them.
+5. `localhost` is an authorized domain by default; add your production domain under
+   **Authentication → Settings → Authorized domains** when you deploy.
 
 ### Installation
 
@@ -221,7 +241,16 @@ The apps will run at:
 
 ## Try It Out
 
-The seed script creates a sample user `user_001`. Try these prompts in the chat UI:
+By default the seed script creates data for a sample user `user_001`. Since real users sign in with Google,
+seed the data against **your own Firebase uid** so it shows up in your account:
+
+```bash
+SEED_USER_ID="<your-firebase-uid>" npm run db:seed
+```
+
+(Find your uid in the Firebase console under Authentication → Users after your first sign-in.)
+
+Try these prompts in the chat UI:
 
 | Prompt | Expected Agent |
 |---|---|
