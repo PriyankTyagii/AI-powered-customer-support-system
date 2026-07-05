@@ -1,13 +1,18 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
-import { Pool } from "pg";
 
-const connectionString =
-  process.env.DATABASE_URL ??
-  "postgresql://postgres:postgres@localhost:5432/support_db?schema=public";
+const connectionString = process.env.DATABASE_URL;
 
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
+if (!connectionString) {
+  // Never fall back to implicit credentials in production; fail loudly.
+  throw new Error("DATABASE_URL is required. Set it in the environment or .env file.");
+}
+
+// Prisma 6 driver adapter: PrismaPg manages its own pg pool from the config.
+// The CLI reads ?schema= from the URL, but the runtime adapter needs it passed
+// explicitly — otherwise queries would target the default `public` schema.
+const schema = new URL(connectionString).searchParams.get("schema") ?? undefined;
+const adapter = new PrismaPg({ connectionString }, schema ? { schema } : undefined);
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;

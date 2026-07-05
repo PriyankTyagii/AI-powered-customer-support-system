@@ -1,17 +1,23 @@
+import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
-import { Pool } from "pg";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   throw new Error("DATABASE_URL is required");
 }
 
-const adapter = new PrismaPg(new Pool({ connectionString }));
+// Match db.ts: the runtime adapter needs the target schema passed explicitly.
+const schema = new URL(connectionString).searchParams.get("schema") ?? undefined;
+const adapter = new PrismaPg({ connectionString }, schema ? { schema } : undefined);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const userId = "user_001";
+  // With Firebase auth, real users are identified by their Firebase uid.
+  // Pass SEED_USER_ID (your uid, shown in the app header menu / Firebase console)
+  // so the seeded orders and invoices belong to your account.
+  const userId = process.env.SEED_USER_ID ?? "user_001";
+  console.log(`Seeding data for userId: ${userId}`);
 
   await prisma.refund.deleteMany();
   await prisma.invoice.deleteMany();
