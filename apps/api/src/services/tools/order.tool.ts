@@ -4,12 +4,24 @@ export class OrderTool {
     if (orderNumber) {
       return prisma.order.findFirst({
         where: { userId, orderNumber },
+        include: { product: true },
       });
     }
 
     return prisma.order.findFirst({
       where: { userId },
       orderBy: { updatedAt: "desc" },
+      include: { product: true },
+    });
+  }
+
+  async fetchRecentOrders(userId: string, take = 5) {
+    const { prisma } = await import("../../db");
+    return prisma.order.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take,
+      include: { product: true },
     });
   }
 
