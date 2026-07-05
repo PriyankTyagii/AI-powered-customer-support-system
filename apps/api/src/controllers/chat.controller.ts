@@ -1,9 +1,10 @@
 import { streamSSE } from "hono/streaming";
-import { createMessageSchema, streamEventSchema } from "@support/shared";
+import { createMessageSchema, renameConversationSchema, streamEventSchema } from "@support/shared";
 import type { Context } from "hono";
 import { ConversationService } from "../services/conversation.service";
 import { RouterService } from "../services/router.service";
 import { AiStreamService } from "../services/ai-stream.service";
+import { generateConversationTitle } from "../services/title.service";
 
 const thinkingWords = ["Thinking", "Searching", "Analyzing", "Reviewing context", "Routing"];
 
@@ -36,11 +37,22 @@ export class ChatController {
     }
 
     if (!conversationId) {
-      const created = await this.conversationService.createConversation(userId, content);
+      const title = await generateConversationTitle(content);
+      const created = await this.conversationService.createConversation(userId, title);
       conversationId = created.id;
     }
 
     const resolvedConversationId = conversationId;
+
+    // Capture prior turns before persisting the new message so history and
+    // the current turn don't overlap.
+    const recentMessages = await this.conversationService.getRecentMessages(
+      resolvedConversationId,
+      8,
+    );
+    const history = recentMessages
+      .reverse()
+      .map((message) => ({ role: message.role as "user" | "assistant", content: message.content }));
 
     await this.conversationService.addMessage({
       conversationId: resolvedConversationId,
@@ -62,7 +74,11 @@ export class ChatController {
 
         let fullResponse = "";
 
-        for await (const delta of this.aiStreamService.streamResponse(routed)) {
+        for await (const delta of this.aiStreamService.streamResponse({
+          ...routed,
+          userMessage: content,
+          history,
+        })) {
           fullResponse += delta;
           const deltaPayload = streamEventSchema.parse({
             type: "delta",
@@ -120,6 +136,32 @@ export class ChatController {
     const userId = c.get("userId");
     const conversations = await this.conversationService.listConversations(userId);
     return c.json(conversations);
+  };
+
+  renameConversation = async (c: Context) => {
+    const conversationId = c.req.param("id");
+    const userId = c.get("userId");
+
+    if (!conversationId) {
+      return c.json({ error: "conversation id is required" }, 400);
+    }
+
+    const parsed = renameConversationSchema.safeParse(await c.req.json());
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.flatten() }, 400);
+    }
+
+    const updated = await this.conversationService.renameConversation(
+      conversationId,
+      userId,
+      parsed.data.title,
+    );
+
+    if (!updated) {
+      return c.json({ error: "Conversation not found" }, 404);
+    }
+
+    return c.json(updated);
   };
 
   deleteConversation = async (c: Context) => {

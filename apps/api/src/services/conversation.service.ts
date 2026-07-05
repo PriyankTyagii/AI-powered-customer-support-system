@@ -32,6 +32,21 @@ export class ConversationService {
     });
   }
 
+  async renameConversation(conversationId: string, userId: string, title: string) {
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, userId },
+    });
+
+    if (!conversation) {
+      return null;
+    }
+
+    return prisma.conversation.update({
+      where: { id: conversationId },
+      data: { title },
+    });
+  }
+
   async deleteConversation(conversationId: string, userId: string) {
     const conversation = await prisma.conversation.findFirst({
       where: { id: conversationId, userId },

@@ -7,4 +7,5 @@ export const chatRoutes = new Hono()
   .post("/messages", controller.postMessage)
   .get("/conversations/:id", controller.getConversation)
   .get("/conversations", controller.listConversations)
+  .patch("/conversations/:id", controller.renameConversation)
   .delete("/conversations/:id", controller.deleteConversation);

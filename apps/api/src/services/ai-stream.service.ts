@@ -1,91 +1,91 @@
-import { createOpenAI } from "@ai-sdk/openai";
-import { streamText } from "ai";
+import { generateText, type CoreMessage } from "ai";
+import { aiProvider } from "./ai-provider";
 
-/** Read an env var, treating empty/whitespace-only values as unset. */
-function env(name: string): string | undefined {
-  const value = process.env[name];
-  return value && value.trim() !== "" ? value : undefined;
-}
+export type HistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+/** Order/invoice/tracking reference numbers. */
+const REF_PATTERN = /\b(?:ORD|INV|TRK)-[A-Z0-9]+\b/gi;
 
 /**
- * Both supported providers expose OpenAI-compatible APIs, so we reuse the
- * OpenAI provider client with a custom baseURL — no extra SDK needed.
- *
- * - Groq (https://groq.com): keys start with "gsk_". Fast open-model inference.
- * - xAI Grok (https://x.ai): keys start with "xai-".
- *
- * Set GROQ_API_KEY or XAI_API_KEY; Groq wins if both are present.
- * Override the model with AI_MODEL.
+ * The draft answer is computed from real database queries and is the source
+ * of truth. The reply may only contain reference numbers that appear in the
+ * draft or the user's own message — anything else means the model pulled a
+ * number from conversation history and the reply cannot be trusted.
  */
-function resolveProvider() {
-  const groqKey = env("GROQ_API_KEY");
-  if (groqKey) {
-    return {
-      client: createOpenAI({ apiKey: groqKey, baseURL: "https://api.groq.com/openai/v1" }),
-      model: env("AI_MODEL") ?? "llama-3.3-70b-versatile",
-    };
-  }
-
-  const xaiKey = env("XAI_API_KEY") ?? env("GROK_API_KEY");
-  if (xaiKey) {
-    return {
-      client: createOpenAI({ apiKey: xaiKey, baseURL: "https://api.x.ai/v1" }),
-      model: env("AI_MODEL") ?? env("XAI_MODEL") ?? "grok-3",
-    };
-  }
-
-  return null;
+function referencesAreValid(reply: string, draft: string, userMessage: string) {
+  const allowed = new Set(
+    [...`${draft} ${userMessage}`.matchAll(REF_PATTERN)].map((m) => m[0].toUpperCase()),
+  );
+  return [...reply.matchAll(REF_PATTERN)].every((m) => allowed.has(m[0].toUpperCase()));
 }
 
-const provider = resolveProvider();
-
 export class AiStreamService {
-  async *streamResponse(input: { response: string; reasoning: string }) {
-    if (provider) {
-      // AI SDK v4 suppresses stream errors unless onError is provided, which
-      // would otherwise surface as a silently empty stream.
-      let streamError: unknown;
-      let emitted = false;
+  async *streamResponse(input: {
+    response: string;
+    reasoning: string;
+    userMessage?: string;
+    history?: HistoryMessage[];
+  }) {
+    let reply = input.response;
 
+    if (aiProvider) {
       try {
-        const result = streamText({
-          model: provider.client(provider.model),
-          system:
-            "You are a customer support AI. Respond with concise and accurate answers. Keep context and keep a helpful tone.",
-          prompt: `Reasoning context: ${input.reasoning}\nDraft answer: ${input.response}`,
-          onError: ({ error }) => {
-            streamError = error;
+        // Prior turns give continuity for follow-ups; the final turn contains
+        // the actual user message plus the authoritative draft.
+        const messages: CoreMessage[] = [
+          ...(input.history ?? []).map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
+          {
+            role: "user" as const,
+            content: [
+              input.userMessage ? `User message: ${input.userMessage}` : undefined,
+              `Reasoning context: ${input.reasoning}`,
+              `Draft answer (authoritative facts): ${input.response}`,
+            ]
+              .filter(Boolean)
+              .join("\n"),
           },
+        ];
+
+        const result = await generateText({
+          model: aiProvider.client(aiProvider.model),
+          system:
+            "You are a customer support AI. Rewrite the draft answer into a concise, friendly reply to the user's message. " +
+            "The draft answer contains the authoritative facts for this turn. Copy every order number, invoice number, " +
+            "tracking number, and amount from the draft EXACTLY — never reuse reference numbers from earlier in the " +
+            "conversation. Do not invent details beyond the draft.",
+          messages,
         });
 
-        for await (const chunk of result.textStream) {
-          emitted = true;
-          yield chunk;
+        const candidate = result.text.trim();
+
+        // Deterministic guards: discard the rewrite if the model swapped in a
+        // reference number from history, or dropped a UI link ([...](#...))
+        // the draft relies on (e.g. the "visit the Store" deep link).
+        const draftHasLink = /\[[^\]]+\]\(#[^)]+\)/.test(input.response);
+        const candidateHasLink = /\[[^\]]+\]\(#[^)]+\)/.test(candidate);
+
+        if (
+          candidate &&
+          referencesAreValid(candidate, input.response, input.userMessage ?? "") &&
+          (!draftHasLink || candidateHasLink)
+        ) {
+          reply = candidate;
+        } else if (candidate) {
+          console.warn("AI reply failed reference/link validation; using draft instead.");
         }
       } catch (error) {
-        streamError = error;
-      }
-
-      if (!streamError && emitted) {
-        return;
-      }
-
-      // Degrade gracefully to the deterministic draft instead of returning
-      // nothing / breaking the SSE connection.
-      console.error("AI stream failed, falling back to draft response:", streamError);
-
-      if (emitted) {
-        // Partial output already reached the client; don't duplicate content.
-        return;
+        console.error("AI generation failed, falling back to draft response:", error);
       }
     }
 
-    yield* this.streamFallback(input.response);
-  }
-
-  private async *streamFallback(response: string) {
-    const chunks = response.split(" ");
-    for (const chunk of chunks) {
+    // Stream the validated reply to the client in small chunks.
+    for (const chunk of reply.split(" ")) {
       yield `${chunk} `;
     }
   }

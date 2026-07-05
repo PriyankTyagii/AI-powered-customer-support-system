@@ -28,6 +28,12 @@ export const messageSchema = z.object({
   createdAt: z.string(),
 });
 
+export const renameConversationSchema = z.object({
+  title: z.string().min(1).max(80),
+});
+
+export type RenameConversationInput = z.infer<typeof renameConversationSchema>;
+
 export const checkoutSchema = z.object({
   productId: z.string().min(1),
   quantity: z.number().int().min(1).max(10),
