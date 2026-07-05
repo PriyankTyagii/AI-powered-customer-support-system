@@ -1,5 +1,5 @@
 import type { StreamEvent } from "@support/shared";
-import type { ChatMessage, ConversationSummary } from "../types";
+import type { ChatMessage, ConversationSummary, Product, StoreOrder } from "../types";
 import { getIdToken } from "./firebase";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
@@ -34,6 +34,54 @@ export async function getConversationMessages(conversationId: string): Promise<C
 
   const payload = (await response.json()) as { messages: ChatMessage[] };
   return payload.messages;
+}
+
+export async function listProducts(): Promise<Product[]> {
+  const response = await fetch(`${baseUrl}/api/store/products`, {
+    headers: await authHeaders(),
+  });
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function listOrders(): Promise<StoreOrder[]> {
+  const response = await fetch(`${baseUrl}/api/store/orders`, {
+    headers: await authHeaders(),
+  });
+  if (!response.ok) return [];
+  return response.json();
+}
+
+async function postJson(path: string, body?: unknown) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: await authHeaders({ "Content-Type": "application/json" }),
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { error?: unknown } | null;
+    const message = typeof payload?.error === "string" ? payload.error : "Request failed";
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+export function checkout(productId: string, quantity: number) {
+  return postJson("/api/store/checkout", { productId, quantity });
+}
+
+export function advanceOrder(orderId: string) {
+  return postJson(`/api/store/orders/${orderId}/advance`);
+}
+
+export function requestRefund(orderId: string, reason: string) {
+  return postJson(`/api/store/orders/${orderId}/refund`, { reason });
+}
+
+export function advanceRefund(orderId: string) {
+  return postJson(`/api/store/orders/${orderId}/refund/advance`);
 }
 
 export async function streamAssistantResponse(payload: {

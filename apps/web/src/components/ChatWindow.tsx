@@ -14,7 +14,15 @@ export function ChatWindow({ messages }: Props) {
               <strong>{message.role === "user" ? "You" : "Assistant"}</strong>
               {message.agentType ? <span>{message.agentType}</span> : null}
             </div>
-            <p>{message.content}</p>
+            {message.role === "assistant" && message.content === "" ? (
+              <span className="dots" aria-label="Assistant is thinking">
+                <i />
+                <i />
+                <i />
+              </span>
+            ) : (
+              <p>{message.content}</p>
+            )}
           </div>
         </div>
       ))}

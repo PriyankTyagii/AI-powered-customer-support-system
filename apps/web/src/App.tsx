@@ -3,6 +3,7 @@ import { ConversationList } from "./components/ConversationList";
 import { ChatWindow } from "./components/ChatWindow";
 import { TypingIndicator } from "./components/TypingIndicator";
 import { Login } from "./components/Login";
+import { Store } from "./components/Store";
 import { useAuth } from "./lib/auth";
 import {
   getConversationMessages,
@@ -50,6 +51,7 @@ function ChatApp({ userName, onSignOut }: { userName: string; onSignOut: () => P
   const [typingLabel, setTypingLabel] = useState<string | undefined>();
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | undefined>();
+  const [view, setView] = useState<"chat" | "store">("chat");
 
   const activeConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === activeConversationId),
@@ -176,6 +178,20 @@ function ChatApp({ userName, onSignOut }: { userName: string; onSignOut: () => P
           <div className="chat-header-top">
             <h1>AI Support Multi-Agent System</h1>
             <div className="user-menu">
+              <nav className="view-tabs">
+                <button
+                  className={view === "chat" ? "active" : ""}
+                  onClick={() => setView("chat")}
+                >
+                  Chat
+                </button>
+                <button
+                  className={view === "store" ? "active" : ""}
+                  onClick={() => setView("store")}
+                >
+                  Store
+                </button>
+              </nav>
               <span className="user-name">{userName}</span>
               <button className="signout-btn" onClick={() => onSignOut()}>
                 Sign out
@@ -183,26 +199,34 @@ function ChatApp({ userName, onSignOut }: { userName: string; onSignOut: () => P
             </div>
           </div>
           <p>
-            {activeConversation
-              ? `Active: ${activeConversation.title}`
-              : "Start a new conversation below"}
+            {view === "store"
+              ? "Buy products to generate real orders, then ask the assistant about them"
+              : activeConversation
+                ? `Active: ${activeConversation.title}`
+                : "Start a new conversation below"}
           </p>
         </header>
 
-        <ChatWindow messages={messages} />
-        <TypingIndicator isTyping={isTyping} label={typingLabel} />
-        {sendError ? <div className="send-error">{sendError}</div> : null}
+        {view === "store" ? (
+          <Store />
+        ) : (
+          <>
+            <ChatWindow messages={messages} />
+            <TypingIndicator isTyping={isTyping} label={typingLabel} />
+            {sendError ? <div className="send-error">{sendError}</div> : null}
 
-        <form className="composer" onSubmit={handleSend}>
-          <input
-            placeholder="Ask about support, orders, billing, refunds..."
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-          />
-          <button disabled={isSending} type="submit">
-            {isSending ? "Sending..." : "Send"}
-          </button>
-        </form>
+            <form className="composer" onSubmit={handleSend}>
+              <input
+                placeholder="Ask about support, orders, billing, refunds..."
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+              />
+              <button disabled={isSending} type="submit">
+                {isSending ? "Sending..." : "Send"}
+              </button>
+            </form>
+          </>
+        )}
       </section>
     </main>
   );
