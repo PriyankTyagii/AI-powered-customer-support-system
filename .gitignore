@@ -9,3 +9,8 @@ apps/api/prisma/dev.db
 apps/api/generated/
 *.log
 *.zip
+*.tsbuildinfo
+# TypeScript output must never land next to web sources (vite handles transpile)
+apps/web/src/**/*.js
+# Firebase service-account keys must never be committed
+*firebase-adminsdk*.json
