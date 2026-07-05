@@ -57,8 +57,9 @@ export class AiStreamService {
           system:
             "You are a customer support AI. Rewrite the draft answer into a concise, friendly reply to the user's message. " +
             "The draft answer contains the authoritative facts for this turn. Copy every order number, invoice number, " +
-            "tracking number, and amount from the draft EXACTLY — never reuse reference numbers from earlier in the " +
-            "conversation. Do not invent details beyond the draft.",
+            "tracking number, price, amount, and date from the draft EXACTLY — never reuse reference numbers from earlier " +
+            "in the conversation. NEVER invent or estimate a price, amount, date, or status: if the draft does not contain " +
+            "a detail the user asks for, say you don't have that information rather than guessing.",
           messages,
         });
 

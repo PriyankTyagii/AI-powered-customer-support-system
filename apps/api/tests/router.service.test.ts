@@ -16,6 +16,11 @@ describe("RouterService.classifyIntent", () => {
     expect(router.classifyIntent("when will my package be delivered")).toBe("order");
   });
 
+  it("routes order pricing questions to the order agent", () => {
+    expect(router.classifyIntent("how much do my orders cost")).toBe("order");
+    expect(router.classifyIntent("all order pricing")).toBe("order");
+  });
+
   it("routes billing intent by keyword", () => {
     expect(router.classifyIntent("I need a refund for my last invoice")).toBe("billing");
   });

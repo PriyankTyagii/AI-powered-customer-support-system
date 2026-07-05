@@ -7,7 +7,13 @@ function extractOrderNumber(content: string) {
 }
 
 function wantsOrderList(content: string) {
-  return /\b(all|list|every|history)\b/i.test(content) || /\borders\b/i.test(content);
+  return (
+    /\b(all|list|every|history)\b/i.test(content) ||
+    /\borders\b/i.test(content) ||
+    // Pricing/cost questions ("how much do they cost", "order pricing")
+    /\b(cost|costs|price|priced|pricing)\b/i.test(content) ||
+    /how much/i.test(content)
+  );
 }
 
 export class OrderAgentService {
@@ -29,9 +35,11 @@ export class OrderAgentService {
       }
 
       const lines = orders.map((order) => {
+        const currency = order.product?.currency ?? "USD";
         const item = order.product ? `${order.quantity} x ${order.product.name}` : "item unavailable";
+        const price = `${currency} ${order.total.toFixed(2)}`;
         const tracking = order.trackingNumber ? `, tracking ${order.trackingNumber}` : "";
-        return `${order.orderNumber} (${item}) — ${order.status}${tracking}`;
+        return `${order.orderNumber} (${item}, ${price}) — ${order.status}${tracking}`;
       });
 
       return {
@@ -53,6 +61,7 @@ export class OrderAgentService {
     }
 
     const delivery = await this.orderTool.checkDeliveryStatus(context.userId, order.orderNumber);
+    const currency = order.product?.currency ?? "USD";
     const itemSummary = order.product
       ? `${order.quantity} x ${order.product.name}`
       : undefined;
@@ -61,6 +70,7 @@ export class OrderAgentService {
       type: "order",
       response: [
         `Order ${order.orderNumber}${itemSummary ? ` (${itemSummary})` : ""} is currently ${order.status}.`,
+        `Order total: ${currency} ${order.total.toFixed(2)}.`,
         delivery?.trackingNumber ? `Tracking number: ${delivery.trackingNumber}.` : "Tracking number not assigned yet.",
         delivery?.eta ? `Estimated delivery: ${new Date(delivery.eta).toDateString()}.` : "ETA is not available yet.",
       ].join(" "),

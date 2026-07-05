@@ -17,7 +17,7 @@ const INVOICE_NUMBER = /\bINV-[A-Z0-9]+\b/i;
 const BILLING_KEYWORDS =
   /\b(bill|billing|payment|payments|pay|paid|invoice|invoices|refund|refunds|refunded|charge|charged|charges|subscription|subscriptions|receipt)\b/i;
 const ORDER_KEYWORDS =
-  /\b(order|orders|track|tracking|delivery|deliver|delivered|shipping|shipment|shipped|package|parcel|eta)\b/i;
+  /\b(order|orders|track|tracking|delivery|deliver|delivered|shipping|shipment|shipped|package|parcel|eta|cost|costs|price|priced|pricing)\b/i;
 
 export class RouterService {
   constructor(
