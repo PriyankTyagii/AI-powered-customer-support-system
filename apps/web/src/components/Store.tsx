@@ -3,10 +3,12 @@ import {
   advanceOrder,
   advanceRefund,
   checkout,
+  deleteOrder,
   listOrders,
   listProducts,
   requestRefund,
 } from "../lib/api";
+import { Modal } from "./Modal";
 import type { Product, StoreOrder } from "../types";
 
 const NEXT_ACTION: Record<string, string> = {
@@ -25,6 +27,8 @@ export function Store() {
   const [busyId, setBusyId] = useState<string | undefined>();
   const [notice, setNotice] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
+  const [refundTarget, setRefundTarget] = useState<StoreOrder | undefined>();
+  const [deleteTarget, setDeleteTarget] = useState<StoreOrder | undefined>();
 
   const refresh = async () => {
     const [productData, orderData] = await Promise.all([listProducts(), listOrders()]);
@@ -61,10 +65,11 @@ export function Store() {
   const handleAdvance = (order: StoreOrder) =>
     run(order.id, () => advanceOrder(order.id), `Order ${order.orderNumber} updated.`);
 
-  const handleRefund = (order: StoreOrder) => {
-    const reason = window.prompt("Why do you want a refund?", "Item arrived damaged");
-    if (!reason) return;
-    return run(
+  const confirmRefund = async (reason?: string) => {
+    const order = refundTarget;
+    setRefundTarget(undefined);
+    if (!order || !reason) return;
+    await run(
       order.id,
       () => requestRefund(order.id, reason),
       `Refund requested for ${order.orderNumber}.`,
@@ -73,6 +78,13 @@ export function Store() {
 
   const handleAdvanceRefund = (order: StoreOrder) =>
     run(order.id, () => advanceRefund(order.id), `Refund updated for ${order.orderNumber}.`);
+
+  const confirmDelete = async () => {
+    const order = deleteTarget;
+    setDeleteTarget(undefined);
+    if (!order) return;
+    await run(order.id, () => deleteOrder(order.id), `Order ${order.orderNumber} deleted.`);
+  };
 
   return (
     <div className="store">
@@ -149,17 +161,49 @@ export function Store() {
                     <button
                       className="secondary"
                       disabled={busyId === order.id}
-                      onClick={() => handleRefund(order)}
+                      onClick={() => setRefundTarget(order)}
                     >
                       Request refund
                     </button>
                   ) : null}
+                  <button
+                    className="icon-btn order-delete"
+                    title="Delete order"
+                    disabled={busyId === order.id}
+                    onClick={() => setDeleteTarget(order)}
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+      {deleteTarget ? (
+        <Modal
+          title={`Delete ${deleteTarget.orderNumber}?`}
+          message={`${deleteTarget.product ? `${deleteTarget.quantity} x ${deleteTarget.product.name} — ` : ""}the order, its invoice, and any refunds will be permanently deleted. This cannot be undone.`}
+          confirmLabel="Delete order"
+          danger
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(undefined)}
+        />
+      ) : null}
+      {refundTarget ? (
+        <Modal
+          title={`Refund ${refundTarget.orderNumber}?`}
+          message={
+            refundTarget.product
+              ? `${refundTarget.quantity} x ${refundTarget.product.name} — the full invoice amount will be refunded once processed.`
+              : "The full invoice amount will be refunded once processed."
+          }
+          confirmLabel="Request refund"
+          input={{ placeholder: "Why do you want a refund?", initialValue: "Item arrived damaged" }}
+          onConfirm={confirmRefund}
+          onCancel={() => setRefundTarget(undefined)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,8 +1,32 @@
+import type { ReactNode } from "react";
 import type { ChatMessage } from "../types";
 
 type Props = {
   messages: ChatMessage[];
 };
+
+/** Render markdown-style [label](url) links (e.g. [Open the Store](#store)) as anchors. */
+function renderWithLinks(text: string): ReactNode[] {
+  const parts: ReactNode[] = [];
+  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = linkPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <a className="message-link" href={match[2]} key={match.index}>
+        {match[1]}
+      </a>,
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  parts.push(text.slice(lastIndex));
+  return parts;
+}
 
 export function ChatWindow({ messages }: Props) {
   return (
@@ -21,7 +45,7 @@ export function ChatWindow({ messages }: Props) {
                 <i />
               </span>
             ) : (
-              <p>{message.content}</p>
+              <p>{renderWithLinks(message.content)}</p>
             )}
           </div>
         </div>

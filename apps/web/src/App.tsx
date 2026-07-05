@@ -6,8 +6,10 @@ import { Login } from "./components/Login";
 import { Store } from "./components/Store";
 import { useAuth } from "./lib/auth";
 import {
+  deleteConversation,
   getConversationMessages,
   listConversations,
+  renameConversation,
   streamAssistantResponse,
 } from "./lib/api";
 import type { ChatMessage, ConversationSummary } from "./types";
@@ -42,16 +44,51 @@ export default function App() {
   return <ChatApp userName={user.displayName ?? user.email ?? "Account"} onSignOut={signOut} />;
 }
 
+const ACTIVE_CONVERSATION_KEY = "support.activeConversationId";
+
 function ChatApp({ userName, onSignOut }: { userName: string; onSignOut: () => Promise<void> }) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [activeConversationId, setActiveConversationId] = useState<string | undefined>();
+  // Restore the active thread across refreshes so messages keep threading
+  // into the same conversation instead of spawning new ones.
+  const [activeConversationId, setActiveConversationId] = useState<string | undefined>(
+    () => localStorage.getItem(ACTIVE_CONVERSATION_KEY) ?? undefined,
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [typingLabel, setTypingLabel] = useState<string | undefined>();
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | undefined>();
-  const [view, setView] = useState<"chat" | "store">("chat");
+  // Tab state is synced with the URL hash so chat messages can deep-link to
+  // the store with plain anchors like [Open the Store](#store).
+  const [view, setViewState] = useState<"chat" | "store">(() =>
+    window.location.hash === "#store" ? "store" : "chat",
+  );
+
+  useEffect(() => {
+    const onHashChange = () =>
+      setViewState(window.location.hash === "#store" ? "store" : "chat");
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  const setView = (next: "chat" | "store") => {
+    window.location.hash = next === "store" ? "#store" : "#chat";
+    setViewState(next);
+  };
+
+  const handleRename = async (conversationId: string, title: string) => {
+    await renameConversation(conversationId, title);
+    await loadConversations();
+  };
+
+  const handleDelete = async (conversationId: string) => {
+    await deleteConversation(conversationId);
+    if (conversationId === activeConversationId) {
+      selectConversation(undefined);
+    }
+    await loadConversations();
+  };
 
   const activeConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === activeConversationId),
@@ -61,9 +98,14 @@ function ChatApp({ userName, onSignOut }: { userName: string; onSignOut: () => P
   const loadConversations = async () => {
     const data = await listConversations();
     setConversations(data);
+  };
 
-    if (!activeConversationId && data.length) {
-      setActiveConversationId(data[0].id);
+  const selectConversation = (conversationId?: string) => {
+    setActiveConversationId(conversationId);
+    if (conversationId) {
+      localStorage.setItem(ACTIVE_CONVERSATION_KEY, conversationId);
+    } else {
+      localStorage.removeItem(ACTIVE_CONVERSATION_KEY);
     }
   };
 
@@ -136,9 +178,9 @@ function ChatApp({ userName, onSignOut }: { userName: string; onSignOut: () => P
           if (streamEvent.type === "done") {
             setIsTyping(false);
             setTypingLabel(undefined);
-            // Adopt the server-created conversation explicitly (fixes the
-            // racy "newest conversation is probably mine" behaviour).
-            setActiveConversationId(streamEvent.conversationId);
+            // Adopt the server-confirmed conversation and persist it so the
+            // thread survives refreshes.
+            selectConversation(streamEvent.conversationId);
             loadConversations();
             loadConversationMessages(streamEvent.conversationId);
             return;
@@ -171,7 +213,13 @@ function ChatApp({ userName, onSignOut }: { userName: string; onSignOut: () => P
       <ConversationList
         conversations={conversations}
         activeId={activeConversationId}
-        onSelect={setActiveConversationId}
+        onSelect={selectConversation}
+        onNewChat={() => {
+          selectConversation(undefined);
+          setView("chat");
+        }}
+        onRename={handleRename}
+        onDelete={handleDelete}
       />
       <section className="chat-panel">
         <header className="chat-header">

@@ -84,6 +84,38 @@ export function advanceRefund(orderId: string) {
   return postJson(`/api/store/orders/${orderId}/refund/advance`);
 }
 
+export async function deleteOrder(orderId: string) {
+  const response = await fetch(`${baseUrl}/api/store/orders/${orderId}`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to delete order");
+  }
+}
+
+export async function renameConversation(conversationId: string, title: string) {
+  const response = await fetch(`${baseUrl}/api/chat/conversations/${conversationId}`, {
+    method: "PATCH",
+    headers: await authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ title }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to rename conversation");
+  }
+  return response.json();
+}
+
+export async function deleteConversation(conversationId: string) {
+  const response = await fetch(`${baseUrl}/api/chat/conversations/${conversationId}`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to delete conversation");
+  }
+}
+
 export async function streamAssistantResponse(payload: {
   conversationId?: string;
   content: string;
