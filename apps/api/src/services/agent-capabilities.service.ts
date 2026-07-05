@@ -20,6 +20,6 @@ export const agentCapabilities: Record<
     type: "billing",
     name: "Billing Agent",
     description: "Handles invoices, refunds, payment issues, and subscriptions.",
-    tools: ["getInvoiceDetails", "checkRefundStatus"],
+    tools: ["getInvoiceDetails", "checkRefundStatus", "createRefundRequest"],
   },
 };

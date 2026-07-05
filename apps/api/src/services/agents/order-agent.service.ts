@@ -23,7 +23,7 @@ export class OrderAgentService {
         return {
           type: "order",
           response:
-            "You have no orders yet. Once you place one, I can report its status, tracking, and delivery estimate.",
+            "You have no orders yet — [visit the Store](#store) to place your first one. After that I can report status, tracking, and delivery estimates.",
           reasoning: "Order list requested but no orders exist.",
         };
       }
@@ -47,7 +47,7 @@ export class OrderAgentService {
       return {
         type: "order",
         response:
-          "I could not find an order for your account. Please share the order number (for example ORD-1001) so I can check status, tracking, changes, or cancellation options.",
+          "I could not find an order for your account. Please share the order number (for example ORD-1001), or if you haven't ordered yet, [visit the Store](#store) to place your first order.",
         reasoning: "Order intent detected but no matching order found.",
       };
     }
