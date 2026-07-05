@@ -153,6 +153,22 @@ export class StoreService {
     });
   }
 
+  /** Delete an order along with its invoices (refunds cascade from invoices). */
+  async deleteOrder(userId: string, orderId: string) {
+    const order = await prisma.order.findFirst({ where: { id: orderId, userId } });
+
+    if (!order) {
+      throw new HttpError(404, "Order not found");
+    }
+
+    await prisma.$transaction([
+      prisma.invoice.deleteMany({ where: { orderId: order.id } }),
+      prisma.order.delete({ where: { id: order.id } }),
+    ]);
+
+    return order;
+  }
+
   /**
    * Demo refund processing: REQUESTED -> APPROVED -> COMPLETED.
    * Completion stamps resolvedAt and marks the invoice REFUNDED.

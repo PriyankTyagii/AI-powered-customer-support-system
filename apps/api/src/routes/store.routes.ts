@@ -8,5 +8,6 @@ export const storeRoutes = new Hono()
   .post("/checkout", controller.checkout)
   .get("/orders", controller.listOrders)
   .post("/orders/:id/advance", controller.advanceOrder)
+  .delete("/orders/:id", controller.deleteOrder)
   .post("/orders/:id/refund", controller.requestRefund)
   .post("/orders/:id/refund/advance", controller.advanceRefund);

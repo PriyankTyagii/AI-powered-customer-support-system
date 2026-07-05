@@ -40,6 +40,16 @@ export class StoreController {
     return c.json(order);
   };
 
+  deleteOrder = async (c: Context) => {
+    const orderId = c.req.param("id");
+    if (!orderId) {
+      return c.json({ error: "order id is required" }, 400);
+    }
+
+    await this.storeService.deleteOrder(c.get("userId"), orderId);
+    return c.json({ ok: true });
+  };
+
   advanceRefund = async (c: Context) => {
     const orderId = c.req.param("id");
     if (!orderId) {
