@@ -28,6 +28,19 @@ export const messageSchema = z.object({
   createdAt: z.string(),
 });
 
+export const checkoutSchema = z.object({
+  productId: z.string().min(1),
+  quantity: z.number().int().min(1).max(10),
+});
+
+export type CheckoutInput = z.infer<typeof checkoutSchema>;
+
+export const refundRequestSchema = z.object({
+  reason: z.string().min(3).max(500),
+});
+
+export type RefundRequestInput = z.infer<typeof refundRequestSchema>;
+
 export const agentCapabilitySchema = z.object({
   type: agentTypeSchema,
   name: z.string(),

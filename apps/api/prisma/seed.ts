@@ -12,98 +12,71 @@ const schema = new URL(connectionString).searchParams.get("schema") ?? undefined
 const adapter = new PrismaPg({ connectionString }, schema ? { schema } : undefined);
 const prisma = new PrismaClient({ adapter });
 
+/**
+ * Seeds only the product catalog (idempotent upserts). Orders, invoices, and
+ * refunds are created by real user actions in the Store UI — never seeded.
+ */
+const products = [
+  {
+    sku: "SKU-KEYB-01",
+    name: "Mechanical Keyboard",
+    description: "Hot-swappable 75% board with tactile switches and PBT keycaps.",
+    price: 129.99,
+    imageEmoji: "⌨️",
+  },
+  {
+    sku: "SKU-MOUS-01",
+    name: "Wireless Mouse",
+    description: "Lightweight 58g wireless mouse with 4K polling dongle.",
+    price: 79.99,
+    imageEmoji: "🖱️",
+  },
+  {
+    sku: "SKU-MONI-01",
+    name: "27\" 4K Monitor",
+    description: "27-inch 4K IPS panel, 144Hz, USB-C with 90W power delivery.",
+    price: 449.99,
+    imageEmoji: "🖥️",
+  },
+  {
+    sku: "SKU-HEAD-01",
+    name: "Noise-Cancelling Headphones",
+    description: "Over-ear ANC headphones with 40h battery and multipoint.",
+    price: 199.99,
+    imageEmoji: "🎧",
+  },
+  {
+    sku: "SKU-DOCK-01",
+    name: "USB-C Dock",
+    description: "11-in-1 dock: dual HDMI, 2.5GbE, SD, and 100W passthrough.",
+    price: 89.99,
+    imageEmoji: "🔌",
+  },
+  {
+    sku: "SKU-CHAR-01",
+    name: "GaN Fast Charger",
+    description: "65W dual-port GaN charger, foldable plug, laptop-ready.",
+    price: 39.99,
+    imageEmoji: "⚡",
+  },
+];
+
 async function main() {
-  // With Firebase auth, real users are identified by their Firebase uid.
-  // Pass SEED_USER_ID (your uid, shown in the app header menu / Firebase console)
-  // so the seeded orders and invoices belong to your account.
-  const userId = process.env.SEED_USER_ID ?? "user_001";
-  console.log(`Seeding data for userId: ${userId}`);
-
-  await prisma.refund.deleteMany();
-  await prisma.invoice.deleteMany();
-  await prisma.order.deleteMany();
-  await prisma.message.deleteMany();
-  await prisma.conversation.deleteMany();
-
-  const orderA = await prisma.order.create({
-    data: {
-      userId,
-      orderNumber: "ORD-1001",
-      status: "SHIPPED",
-      trackingNumber: "TRK-889911",
-      eta: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-    },
-  });
-
-  const orderB = await prisma.order.create({
-    data: {
-      userId,
-      orderNumber: "ORD-1002",
-      status: "PROCESSING",
-    },
-  });
-
-  const invoiceA = await prisma.invoice.create({
-    data: {
-      invoiceNo: "INV-3001",
-      userId,
-      orderId: orderA.id,
-      amount: 149.99,
-      currency: "USD",
-      status: "PAID",
-      issuedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      dueAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    },
-  });
-
-  await prisma.invoice.create({
-    data: {
-      invoiceNo: "INV-3002",
-      userId,
-      orderId: orderB.id,
-      amount: 49.99,
-      currency: "USD",
-      status: "PENDING",
-      issuedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      dueAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-    },
-  });
-
-  await prisma.refund.create({
-    data: {
-      invoiceId: invoiceA.id,
-      amount: 20,
-      reason: "Partial refund for delayed shipping",
-      status: "COMPLETED",
-      requestedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      resolvedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-    },
-  });
-
-  const conversation = await prisma.conversation.create({
-    data: {
-      userId,
-      title: "Refund and delivery question",
-    },
-  });
-
-  await prisma.message.createMany({
-    data: [
-      {
-        conversationId: conversation.id,
-        role: "user",
-        content: "Hi, where is my order ORD-1001?",
+  for (const product of products) {
+    await prisma.product.upsert({
+      where: { sku: product.sku },
+      update: {
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        imageEmoji: product.imageEmoji,
+        active: true,
       },
-      {
-        conversationId: conversation.id,
-        role: "assistant",
-        content: "Your order ORD-1001 is in transit and should arrive in 2 days.",
-        agentType: "order",
-      },
-    ],
-  });
+      create: product,
+    });
+  }
 
-  console.log("Seed data inserted successfully.");
+  console.log(`Product catalog seeded (${products.length} products).`);
 }
 
 main()

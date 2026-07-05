@@ -31,15 +31,31 @@ model Message {
   @@index([createdAt])
 }
 
+model Product {
+  id          String  @id @default(cuid())
+  sku         String  @unique
+  name        String
+  description String
+  price       Float
+  currency    String  @default("USD")
+  imageEmoji  String  @default("📦")
+  active      Boolean @default(true)
+  orders      Order[]
+}
+
 model Order {
   id             String      @id @default(cuid())
   orderNumber    String      @unique
   userId         String
+  productId      String?
+  quantity       Int         @default(1)
+  total          Float       @default(0)
   status         OrderStatus
   trackingNumber String?
   eta            DateTime?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+  product        Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
   invoices       Invoice[]
 
   @@index([userId])
