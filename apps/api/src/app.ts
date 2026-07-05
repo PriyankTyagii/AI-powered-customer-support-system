@@ -10,7 +10,20 @@ import { storeRoutes } from "./routes/store.routes";
 
 const app = new Hono();
 
-app.use("*", cors());
+// Restrict CORS to the configured origins in production; allow any in dev.
+// CORS_ORIGIN is a comma-separated allow-list (e.g. the deployed web URL).
+const allowedOrigins = process.env.CORS_ORIGIN?.split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  "*",
+  cors({
+    origin: allowedOrigins && allowedOrigins.length ? allowedOrigins : "*",
+    allowHeaders: ["Content-Type", "Authorization"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  }),
+);
 app.use("*", rateLimit);
 app.onError(handleError);
 
