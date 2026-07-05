@@ -1,23 +1,32 @@
 import type { StreamEvent } from "@support/shared";
 import type { ChatMessage, ConversationSummary } from "../types";
+import { getIdToken } from "./firebase";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
-export async function listConversations(userId: string): Promise<ConversationSummary[]> {
-  const response = await fetch(`${baseUrl}/api/chat/conversations?userId=${encodeURIComponent(userId)}`);
+/** Build request headers with the current user's Firebase ID token attached. */
+async function authHeaders(extra: Record<string, string> = {}): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...extra,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+export async function listConversations(): Promise<ConversationSummary[]> {
+  const response = await fetch(`${baseUrl}/api/chat/conversations`, {
+    headers: await authHeaders(),
+  });
   if (!response.ok) {
     return [];
   }
   return response.json();
 }
 
-export async function getConversationMessages(input: {
-  userId: string;
-  conversationId: string;
-}): Promise<ChatMessage[]> {
-  const response = await fetch(
-    `${baseUrl}/api/chat/conversations/${input.conversationId}?userId=${encodeURIComponent(input.userId)}`,
-  );
+export async function getConversationMessages(conversationId: string): Promise<ChatMessage[]> {
+  const response = await fetch(`${baseUrl}/api/chat/conversations/${conversationId}`, {
+    headers: await authHeaders(),
+  });
 
   if (!response.ok) {
     return [];
@@ -28,18 +37,14 @@ export async function getConversationMessages(input: {
 }
 
 export async function streamAssistantResponse(payload: {
-  userId: string;
   conversationId?: string;
   content: string;
   onEvent: (event: StreamEvent) => void;
 }) {
   const response = await fetch(`${baseUrl}/api/chat/messages`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: await authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
-      userId: payload.userId,
       conversationId: payload.conversationId,
       content: payload.content,
     }),

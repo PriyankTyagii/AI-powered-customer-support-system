@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ConversationList } from "./components/ConversationList";
 import { ChatWindow } from "./components/ChatWindow";
 import { TypingIndicator } from "./components/TypingIndicator";
+import { Login } from "./components/Login";
+import { useAuth } from "./lib/auth";
 import {
   getConversationMessages,
   listConversations,
@@ -20,7 +22,26 @@ function createTempMessage(content: string): ChatMessage {
 }
 
 export default function App() {
-  const userId = "user_001";
+  const { user, loading, signOut } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="login-screen">
+        <div className="login-card">
+          <p>Loading…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
+
+  return <ChatApp userName={user.displayName ?? user.email ?? "Account"} onSignOut={signOut} />;
+}
+
+function ChatApp({ userName, onSignOut }: { userName: string; onSignOut: () => Promise<void> }) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | undefined>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -28,6 +49,7 @@ export default function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [typingLabel, setTypingLabel] = useState<string | undefined>();
   const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | undefined>();
 
   const activeConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === activeConversationId),
@@ -35,7 +57,7 @@ export default function App() {
   );
 
   const loadConversations = async () => {
-    const data = await listConversations(userId);
+    const data = await listConversations();
     setConversations(data);
 
     if (!activeConversationId && data.length) {
@@ -44,10 +66,7 @@ export default function App() {
   };
 
   const loadConversationMessages = async (conversationId: string) => {
-    const data = await getConversationMessages({
-      conversationId,
-      userId,
-    });
+    const data = await getConversationMessages(conversationId);
     setMessages(data);
   };
 
@@ -80,10 +99,10 @@ export default function App() {
     const content = input;
     setInput("");
     setIsSending(true);
+    setSendError(undefined);
 
     try {
       await streamAssistantResponse({
-        userId,
         conversationId: activeConversationId,
         content,
         onEvent: (streamEvent) => {
@@ -115,15 +134,31 @@ export default function App() {
           if (streamEvent.type === "done") {
             setIsTyping(false);
             setTypingLabel(undefined);
+            // Adopt the server-created conversation explicitly (fixes the
+            // racy "newest conversation is probably mine" behaviour).
+            setActiveConversationId(streamEvent.conversationId);
             loadConversations();
-            if (activeConversationId) {
-              loadConversationMessages(activeConversationId);
-            }
+            loadConversationMessages(streamEvent.conversationId);
+            return;
+          }
+
+          if (streamEvent.type === "error") {
+            setIsTyping(false);
+            setTypingLabel(undefined);
+            setSendError(streamEvent.message);
+            // Drop the empty assistant placeholder bubble.
+            setMessages((prev) =>
+              prev.filter((message) => message.role !== "assistant" || message.content !== ""),
+            );
           }
         },
       });
     } catch (error) {
       console.error(error);
+      setSendError("Failed to send message. Please check your connection and try again.");
+      setMessages((prev) =>
+        prev.filter((message) => message.role !== "assistant" || message.content !== ""),
+      );
     } finally {
       setIsSending(false);
     }
@@ -138,7 +173,15 @@ export default function App() {
       />
       <section className="chat-panel">
         <header className="chat-header">
-          <h1>AI Support Multi-Agent System</h1>
+          <div className="chat-header-top">
+            <h1>AI Support Multi-Agent System</h1>
+            <div className="user-menu">
+              <span className="user-name">{userName}</span>
+              <button className="signout-btn" onClick={() => onSignOut()}>
+                Sign out
+              </button>
+            </div>
+          </div>
           <p>
             {activeConversation
               ? `Active: ${activeConversation.title}`
@@ -148,6 +191,7 @@ export default function App() {
 
         <ChatWindow messages={messages} />
         <TypingIndicator isTyping={isTyping} label={typingLabel} />
+        {sendError ? <div className="send-error">{sendError}</div> : null}
 
         <form className="composer" onSubmit={handleSend}>
           <input
